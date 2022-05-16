@@ -2,38 +2,57 @@
 const resContainer = document.querySelector(".responses");
 
 const btn = document.querySelector(".btn-submit");
-const btnLoad = document.querySelector(".btn-load");
-const btnHide = document.querySelector(".btn-hide");
 const btnScroll = document.querySelector(".btn-scroll");
 
 const prompt = document.querySelector(".prompt");
-const resHeader = document.querySelector(".responses-header");
-const storedResult = localStorage.getItem("results");
-const oldResContainer = document.createElement("div");
-const oldResHeader = document.createElement("h2");
-
-const allResults = [];
+const resHeading = document.querySelector(".res-heading");
+const storedResult = JSON.parse(localStorage.getItem("allResults"));
+const data = {
+  temperature: 0.5,
+  max_tokens: 64,
+  top_p: 1.0,
+  frequency_penalty: 0.0,
+  presence_penalty: 0.0,
+};
 
 let userInput = "";
 
 //Functions
 
-const addResponse = function (data) {
-  resHeader.classList.remove("responses-header");
+const getDate = function () {
+  const curDate = new Date();
+  const locale = navigator.language;
+  const options = {
+    hour: "numeric",
+    minute: "numeric",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  };
 
+  const dateTime = new Intl.DateTimeFormat(locale, options).format(curDate);
+
+  return dateTime;
+};
+
+const addResponse = function (data) {
+  resHeading.classList.remove("hide");
   const html = `
-    <table class="responses-table" cellspacing="20">
-      <tr>
-        <td class="cell-header">Prompt:</th>
-        <td>${userInput}</td>
-      </tr>
-      <tr>
-        <td class="cell-header">Response:</td>
-        <td>
-        ${data.choices[0].text}
-        </td>
-      </tr>
-    </table>`;
+  <table class="responses-table" cellspacing="20">
+  <tr>
+    <td colspan="2" class="cell-header timestamp" >${getDate()}</td>
+  </tr>
+  <tr>
+    <td class="cell-header">Prompt:</th>
+    <td class="user-input">${userInput}</td>
+  </tr>
+  <tr>
+    <td class="cell-header">Response:</td>
+    <td class="response">
+    ${data.choices[0].text}
+    </td>
+  </tr>
+</table>`;
 
   resContainer.insertAdjacentHTML("afterbegin", html);
   saveToLocalStorage();
@@ -41,70 +60,83 @@ const addResponse = function (data) {
 };
 
 const saveToLocalStorage = function () {
-  localStorage.setItem("results", resContainer.outerHTML);
+  const userInput = document.querySelector(".user-input").innerText;
+  const response = document.querySelector(".response").innerText;
+  const timestamp = document.querySelector(".timestamp").innerText;
+  const results = {
+    userInput: userInput,
+    response: response,
+    timestamp: timestamp,
+  };
+  const currentItems = JSON.parse(localStorage.getItem("allResults")) || [];
+
+  currentItems.push(results);
+
+  localStorage.setItem("allResults", JSON.stringify(currentItems));
 };
 
-//Event Handlers
+const getCompletions = function () {
+  const key = "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";
 
-btn.addEventListener("click", function (e) {
-  e.preventDefault();
-  btn.classList.toggle("btn-loading");
-
-  userInput = prompt.value;
-
-  const data = {
-    prompt: userInput,
-    temperature: 0.5,
-    max_tokens: 64,
-    top_p: 1.0,
-    frequency_penalty: 0.0,
-    presence_penalty: 0.0,
-  };
-
-  const key = "";
-
-  fetch("https://api.openai.com/v1/engines/text-curie-001/completions", {
+  return fetch("https://api.openai.com/v1/engines/text-curie-001/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify(data),
-  })
-    .then((res) => res.json())
+  }).then((res) => res.json());
+};
+
+const showPreviousResponses = function () {
+  if (storedResult) {
+    for (let eachResult of storedResult) {
+      const html = `
+      <table class="responses-table" cellspacing="20">
+        <tr>
+          <td colspan="2" class="cell-header timestamp" >${eachResult.timestamp}</td>
+        </tr>
+        <tr>
+          <td class="cell-header">Prompt:</th>
+          <td class="user-input">${eachResult.userInput}</td>
+        </tr>
+        <tr>
+          <td class="cell-header">Response:</td>
+          <td class="response">
+          ${eachResult.response}
+          </td>
+        </tr>
+      </table>`;
+      resContainer.insertAdjacentHTML("afterbegin", html);
+    }
+  }
+};
+
+showPreviousResponses();
+
+//Event Handlers
+
+btn.addEventListener("click", function (e) {
+  e.preventDefault();
+  btn.classList.toggle("btn-loading");
+  btn.disabled = true;
+
+  userInput = prompt.value;
+  data.prompt = userInput;
+
+  getCompletions()
     .then((data) => {
       addResponse(data);
     })
     .catch((err) => {
       console.error(err);
-      resHeader.classList.remove("responses-header");
-
-      resHeader.innerHTML = `${err.message} 😞`;
+      resHeading.classList.remove("hide");
+      resHeading.innerHTML = `${err.message} 😞`;
     })
     .finally(() => {
       btn.classList.toggle("btn-loading");
+      btn.disabled = false;
     });
-});
-
-btnLoad.addEventListener("click", function () {
-  console.log(storedResult);
-  if (storedResult) {
-    btnLoad.classList.remove("btn--active");
-    btnHide.classList.add("btn--active");
-    resContainer.insertAdjacentElement("afterend", oldResContainer);
-    oldResContainer.insertAdjacentElement("afterbegin", oldResHeader);
-    oldResHeader.innerHTML = "Previous Responses";
-    oldResContainer.insertAdjacentHTML("beforeend", storedResult);
-  } else {
-    alert("There is no previous data");
-  }
-});
-
-btnHide.addEventListener("click", function () {
-  btnLoad.classList.add("btn--active");
-  btnHide.classList.remove("btn--active");
-  resHeader.classList.add("responses-header");
-  oldResContainer.innerHTML = "";
 });
 
 btnScroll.addEventListener("click", function () {
