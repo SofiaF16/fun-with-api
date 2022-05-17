@@ -76,7 +76,7 @@ const saveToLocalStorage = function () {
 };
 
 const getCompletions = function () {
-  const key = "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";
+  const key = "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";
 
   return fetch("https://api.openai.com/v1/engines/text-curie-001/completions", {
     method: "POST",
